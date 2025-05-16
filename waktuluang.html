@@ -1,68 +1,123 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-  <title>Data Google Sheets</title>
+  <meta charset="UTF-8">
+  <title>Data Waktu Luang Santri</title>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
   <style>
     body {
-      font-family: sans-serif;
-      background-color: #f0f8ff;
+      font-family: 'Segoe UI', sans-serif;
+      background: #e3f2fd;
       padding: 20px;
+      margin: 0;
     }
     h2 {
       color: #0d47a1;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .filter-bar {
+      max-width: 900px;
+      margin: auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+    select {
+      padding: 6px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #90caf9;
+    }
+    .table-container {
+      max-width: 900px;
+      margin: auto;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
     }
     table {
-      border-collapse: collapse;
       width: 100%;
-      background-color: #ffffff;
-    }
-    th, td {
-      border: 1px solid #90caf9;
-      padding: 8px;
-      text-align: left;
-    }
-    th {
-      background-color: #1976d2;
-      color: white;
     }
   </style>
 </head>
 <body>
 
-<h2>Data dari Google Sheets</h2>
-<table id="data-table"></table>
+<h2>Data Waktu Luang Santri</h2>
+
+<div class="filter-bar">
+  <label>Filter Hari:
+    <select id="filterHari">
+      <option value="">Semua</option>
+    </select>
+  </label>
+  <label>Filter Guru:
+    <select id="filterGuru">
+      <option value="">Semua</option>
+    </select>
+  </label>
+</div>
+
+<div class="table-container">
+  <table id="dataTable" class="display nowrap" cellspacing="0">
+    <thead></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- JS Libraries -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
-const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSF7jMgfj3EHbNfl8WuAVtZPkwA58ucQXuEG2WUZD4gzyf3vMq3Ew4ttxPBqsFc9GqltgmLSZUcisXA/pub?gid=1463205391&single=true&output=csv';
+  const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSF7jMgfj3EHbNfl8WuAVtZPkwA58ucQXuEG2WUZD4gzyf3vMq3Ew4ttxPBqsFc9GqltgmLSZUcisXA/pub?gid=1463205391&single=true&output=csv';
 
-fetch(csvUrl)
-  .then(response => response.text())
-  .then(data => {
-    const rows = data.split('\n').map(row => row.split(','));
-    const table = document.getElementById('data-table');
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    complete: function(results) {
+      const data = results.data.filter(row => Object.values(row).some(cell => cell !== ""));
+      const columns = Object.keys(data[0]).map(key => ({ title: key, data: key }));
 
-    // Tambahkan header
-    const headerRow = document.createElement('tr');
-    rows[0].forEach(cell => {
-      const th = document.createElement('th');
-      th.textContent = cell;
-      headerRow.appendChild(th);
-    });
-    table.appendChild(headerRow);
-
-    // Tambahkan isi
-    for (let i = 1; i < rows.length; i++) {
-      const tr = document.createElement('tr');
-      rows[i].forEach(cell => {
-        const td = document.createElement('td');
-        td.textContent = cell;
-        tr.appendChild(td);
+      const hariSet = new Set();
+      const guruSet = new Set();
+      data.forEach(row => {
+        if (row['Hari']) hariSet.add(row['Hari']);
+        if (row['Guru']) guruSet.add(row['Guru']);
       });
-      table.appendChild(tr);
+
+      hariSet.forEach(h => {
+        $('#filterHari').append(`<option value="${h}">${h}</option>`);
+      });
+      guruSet.forEach(g => {
+        $('#filterGuru').append(`<option value="${g}">${g}</option>`);
+      });
+
+      const table = $('#dataTable').DataTable({
+        data: data,
+        columns: columns,
+        dom: 'Bfrtip',
+        buttons: ['excelHtml5', 'pdfHtml5'],
+        responsive: true,
+        pageLength: 20
+      });
+
+      $('#filterHari').on('change', function () {
+        table.column(columns.findIndex(c => c.title === 'Hari')).search(this.value).draw();
+      });
+      $('#filterGuru').on('change', function () {
+        table.column(columns.findIndex(c => c.title === 'Guru')).search(this.value).draw();
+      });
     }
-  })
-  .catch(err => {
-    console.error('Gagal fetch data:', err);
   });
 </script>
 
